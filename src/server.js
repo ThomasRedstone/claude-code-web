@@ -793,6 +793,17 @@ ${cleanOutput}
       }
     });
 
+    // Save workspace layout
+    this.app.put('/api/workspaces/:id/layout', async (req, res) => {
+      try {
+        const { layout } = req.body;
+        const workspace = await this.workspaceStore.updateWorkspace(req.params.id, { layout });
+        res.json({ success: true, workspace });
+      } catch (error) {
+        res.status(500).json({ error: 'Failed to save workspace layout', message: error.message });
+      }
+    });
+
     // Session export endpoint
     this.app.get('/api/sessions/:sessionId/export', (req, res) => {
       try {

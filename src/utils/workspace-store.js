@@ -71,6 +71,7 @@ class WorkspaceStore {
       color: workspace.color || '#58a6ff',
       sessions: workspace.sessions || [],
       maniTags: workspace.maniTags || [], // Auto-add sessions from these mani tags
+      layout: workspace.layout || null, // Saved split layout
       createdAt: new Date().toISOString()
     };
 

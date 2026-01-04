@@ -817,13 +817,22 @@ body {
     position: relative;
 }
 
+.split-row {
+    display: flex;
+    flex-direction: row;
+    min-height: 0;
+    position: relative;
+}
+
 .split-pane {
     position: relative;
     display: flex;
     flex-direction: column;
     min-width: 0;
+    min-height: 0;
     background: var(--bg-primary);
     transition: border-color 0.2s ease;
+    box-sizing: border-box;
 }
 
 .split-pane.split-active {
@@ -833,7 +842,7 @@ body {
 .split-terminal-wrapper {
     flex: 1;
     min-height: 0;
-  width: 100%;
+    width: 100%;
     display: flex;
     flex-direction: column;
 }
@@ -846,16 +855,30 @@ body {
     width: 50%;
 }
 
-.split-divider {
+/* Vertical divider (for side-by-side splits) */
+.split-divider,
+.split-divider-vertical {
     width: 6px;
-  background: var(--border);
+    background: var(--border);
     cursor: col-resize;
     flex-shrink: 0;
     transition: background 0.2s ease;
 }
 
-.split-divider:hover {
-    background: var(--border-hover);
+/* Horizontal divider (for stacked splits) */
+.split-divider-horizontal {
+    height: 6px;
+    width: 100%;
+    background: var(--border);
+    cursor: row-resize;
+    flex-shrink: 0;
+    transition: background 0.2s ease;
+}
+
+.split-divider:hover,
+.split-divider-vertical:hover,
+.split-divider-horizontal:hover {
+    background: var(--accent);
 }
 
 .split-close {
@@ -883,18 +906,106 @@ body {
     color: var(--text-primary);
 }
 
-/* Drop zone for drag-to-split */
+/* Layout Selector */
+.layout-selector {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 20;
+}
+
+.layout-btn {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-secondary);
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.layout-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-color: var(--border-hover);
+}
+
+.layout-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 4px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px;
+    min-width: 160px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.layout-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    color: var(--text-primary);
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s ease;
+}
+
+.layout-option:hover {
+    background: var(--bg-tertiary);
+}
+
+.layout-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    color: var(--text-secondary);
+}
+
+.layout-name {
+    font-size: 13px;
+}
+
+/* Drop zones for drag-to-split */
 .split-drop-zone {
     position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background: rgba(88, 166, 255, 0.15);
     border: 2px dashed rgba(88, 166, 255, 0.5);
     border-radius: 8px;
     pointer-events: none;
     z-index: 100;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--accent);
+}
+
+.split-drop-right {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 100px;
+}
+
+.split-drop-bottom {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 100px;
 }
 
 #terminal {
