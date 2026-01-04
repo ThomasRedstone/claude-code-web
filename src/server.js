@@ -12,6 +12,7 @@ const AgentBridge = require('./agent-bridge');
 const SessionStore = require('./utils/session-store');
 const ManiIntegration = require('./utils/mani');
 const TemplateStore = require('./utils/template-store');
+const WorkspaceStore = require('./utils/workspace-store');
 const UsageReader = require('./usage-reader');
 const UsageAnalytics = require('./usage-analytics');
 
@@ -39,6 +40,7 @@ class ClaudeCodeWebServer {
     this.sessionStore = new SessionStore();
     this.maniIntegration = new ManiIntegration();
     this.templateStore = new TemplateStore();
+    this.workspaceStore = new WorkspaceStore();
     this.usageReader = new UsageReader(this.sessionDurationHours);
     this.usageAnalytics = new UsageAnalytics({
       sessionDurationHours: this.sessionDurationHours,
@@ -733,6 +735,61 @@ ${cleanOutput}
         res.json({ success: true, branch, modified, isRepo: true });
       } catch (error) {
         res.json({ success: false, isRepo: false });
+      }
+    });
+
+    // Workspace endpoints
+    this.app.get('/api/workspaces', async (req, res) => {
+      try {
+        const workspaces = await this.workspaceStore.getWorkspaces();
+        res.json({ success: true, workspaces });
+      } catch (error) {
+        res.status(500).json({ error: 'Failed to load workspaces', message: error.message });
+      }
+    });
+
+    this.app.post('/api/workspaces', async (req, res) => {
+      try {
+        const workspace = await this.workspaceStore.createWorkspace(req.body);
+        res.json({ success: true, workspace });
+      } catch (error) {
+        res.status(500).json({ error: 'Failed to create workspace', message: error.message });
+      }
+    });
+
+    this.app.put('/api/workspaces/:id', async (req, res) => {
+      try {
+        const workspace = await this.workspaceStore.updateWorkspace(req.params.id, req.body);
+        res.json({ success: true, workspace });
+      } catch (error) {
+        res.status(500).json({ error: 'Failed to update workspace', message: error.message });
+      }
+    });
+
+    this.app.delete('/api/workspaces/:id', async (req, res) => {
+      try {
+        await this.workspaceStore.deleteWorkspace(req.params.id);
+        res.json({ success: true });
+      } catch (error) {
+        res.status(500).json({ error: 'Failed to delete workspace', message: error.message });
+      }
+    });
+
+    this.app.post('/api/workspaces/:id/sessions/:sessionId', async (req, res) => {
+      try {
+        const workspace = await this.workspaceStore.addSessionToWorkspace(req.params.id, req.params.sessionId);
+        res.json({ success: true, workspace });
+      } catch (error) {
+        res.status(500).json({ error: 'Failed to add session to workspace', message: error.message });
+      }
+    });
+
+    this.app.delete('/api/workspaces/:id/sessions/:sessionId', async (req, res) => {
+      try {
+        const workspace = await this.workspaceStore.removeSessionFromWorkspace(req.params.id, req.params.sessionId);
+        res.json({ success: true, workspace });
+      } catch (error) {
+        res.status(500).json({ error: 'Failed to remove session from workspace', message: error.message });
       }
     });
 
