@@ -721,6 +721,148 @@ ${cleanOutput}
       }
     });
 
+    // List all K8s contexts
+    this.app.get('/api/k8s/contexts', async (req, res) => {
+      try {
+        const { execSync } = require('child_process');
+        const output = execSync('kubectl config get-contexts -o name 2>/dev/null', { encoding: 'utf8' });
+        const currentContext = execSync('kubectl config current-context 2>/dev/null', { encoding: 'utf8' }).trim();
+        const contexts = output.trim().split('\n').filter(Boolean).map(name => ({
+          name,
+          current: name === currentContext
+        }));
+        res.json({ success: true, contexts, current: currentContext });
+      } catch (error) {
+        res.json({ success: false, contexts: [], error: 'kubectl not available' });
+      }
+    });
+
+    // Switch K8s context
+    this.app.post('/api/k8s/context', async (req, res) => {
+      try {
+        const { context } = req.body;
+        if (!context) {
+          return res.status(400).json({ error: 'Context name required' });
+        }
+        const { execSync } = require('child_process');
+        execSync(`kubectl config use-context "${context.replace(/"/g, '\\"')}" 2>/dev/null`, { encoding: 'utf8' });
+        const namespace = execSync('kubectl config view --minify -o jsonpath="{..namespace}" 2>/dev/null', { encoding: 'utf8' }).trim() || 'default';
+        res.json({ success: true, context, namespace });
+      } catch (error) {
+        res.status(500).json({ success: false, error: 'Failed to switch context', message: error.message });
+      }
+    });
+
+    // List namespaces in current context
+    this.app.get('/api/k8s/namespaces', async (req, res) => {
+      try {
+        const { execSync } = require('child_process');
+        const output = execSync('kubectl get namespaces -o jsonpath="{.items[*].metadata.name}" 2>/dev/null', { encoding: 'utf8' });
+        const namespaces = output.trim().split(' ').filter(Boolean);
+        const currentNs = execSync('kubectl config view --minify -o jsonpath="{..namespace}" 2>/dev/null', { encoding: 'utf8' }).trim() || 'default';
+        res.json({ success: true, namespaces, current: currentNs });
+      } catch (error) {
+        res.json({ success: false, namespaces: [], error: 'kubectl not available' });
+      }
+    });
+
+    // Switch K8s namespace
+    this.app.post('/api/k8s/namespace', async (req, res) => {
+      try {
+        const { namespace } = req.body;
+        if (!namespace) {
+          return res.status(400).json({ error: 'Namespace required' });
+        }
+        const { execSync } = require('child_process');
+        execSync(`kubectl config set-context --current --namespace="${namespace.replace(/"/g, '\\"')}" 2>/dev/null`, { encoding: 'utf8' });
+        res.json({ success: true, namespace });
+      } catch (error) {
+        res.status(500).json({ success: false, error: 'Failed to switch namespace', message: error.message });
+      }
+    });
+
+    // List pods in current namespace
+    this.app.get('/api/k8s/pods', async (req, res) => {
+      try {
+        const { execSync } = require('child_process');
+        const { namespace } = req.query;
+        const nsFlag = namespace ? `-n ${namespace.replace(/[^a-z0-9-]/gi, '')}` : '';
+        const output = execSync(`kubectl get pods ${nsFlag} -o json 2>/dev/null`, { encoding: 'utf8' });
+        const data = JSON.parse(output);
+        const pods = data.items.map(pod => ({
+          name: pod.metadata.name,
+          namespace: pod.metadata.namespace,
+          status: pod.status.phase,
+          ready: pod.status.containerStatuses ?
+            pod.status.containerStatuses.filter(c => c.ready).length + '/' + pod.status.containerStatuses.length :
+            '0/0',
+          restarts: pod.status.containerStatuses ?
+            pod.status.containerStatuses.reduce((sum, c) => sum + c.restartCount, 0) : 0,
+          containers: pod.spec.containers.map(c => c.name)
+        }));
+        res.json({ success: true, pods });
+      } catch (error) {
+        res.json({ success: false, pods: [], error: error.message });
+      }
+    });
+
+    // Get pod logs
+    this.app.get('/api/k8s/pods/:name/logs', async (req, res) => {
+      try {
+        const { spawn } = require('child_process');
+        const { name } = req.params;
+        const { namespace, container, tail = '100', follow } = req.query;
+
+        // Sanitize inputs
+        const safeName = name.replace(/[^a-z0-9-]/gi, '');
+        const safeNs = namespace ? namespace.replace(/[^a-z0-9-]/gi, '') : 'default';
+        const safeContainer = container ? container.replace(/[^a-z0-9-]/gi, '') : '';
+        const safeTail = parseInt(tail) || 100;
+
+        if (follow === 'true') {
+          // Streaming logs via SSE
+          res.setHeader('Content-Type', 'text/event-stream');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.setHeader('Connection', 'keep-alive');
+
+          const args = ['logs', '-f', `--tail=${safeTail}`, '-n', safeNs, safeName];
+          if (safeContainer) args.push('-c', safeContainer);
+
+          const proc = spawn('kubectl', args);
+
+          proc.stdout.on('data', (data) => {
+            const lines = data.toString().split('\n');
+            lines.forEach(line => {
+              if (line) res.write(`data: ${JSON.stringify({ line })}\n\n`);
+            });
+          });
+
+          proc.stderr.on('data', (data) => {
+            res.write(`data: ${JSON.stringify({ error: data.toString() })}\n\n`);
+          });
+
+          proc.on('close', () => {
+            res.write('data: {"done": true}\n\n');
+            res.end();
+          });
+
+          req.on('close', () => {
+            proc.kill();
+          });
+        } else {
+          // One-time fetch
+          const { execSync } = require('child_process');
+          const args = ['logs', `--tail=${safeTail}`, '-n', safeNs, safeName];
+          if (safeContainer) args.push('-c', safeContainer);
+
+          const logs = execSync(`kubectl ${args.join(' ')} 2>/dev/null`, { encoding: 'utf8' });
+          res.json({ success: true, logs });
+        }
+      } catch (error) {
+        res.json({ success: false, logs: '', error: error.message });
+      }
+    });
+
     // Git status endpoint for current session working dir
     this.app.get('/api/git/status', async (req, res) => {
       const { path: workingDir } = req.query;

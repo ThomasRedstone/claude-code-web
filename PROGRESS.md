@@ -73,7 +73,22 @@ aa2e6e4 feat: add session templates for quick-launch presets
 - `/api/k8s/context` - Get current kubectl context/namespace
 - Status bar shows: `microk8s/default`
 
-#### 3.2 Git Status Display ✅
+#### 3.2 K8s Context Switcher ✅
+- Click on K8s status bar item to open switcher modal
+- `/api/k8s/contexts` - List all available contexts
+- `/api/k8s/namespaces` - List namespaces in current context
+- `POST /api/k8s/context` - Switch context
+- `POST /api/k8s/namespace` - Switch namespace
+- Real-time namespace refresh when switching contexts
+
+#### 3.3 Pod Viewer & Log Streaming ✅
+- "View Pods" button in context switcher
+- `/api/k8s/pods` - List pods with status, ready count, restarts
+- `/api/k8s/pods/:name/logs` - Get pod logs (one-time or streaming)
+- Server-Sent Events (SSE) for real-time log following
+- Pod status colors: Running (green), Pending (yellow), Failed (red)
+
+#### 3.4 Git Status Display ✅
 - `/api/git/status` - Get branch and modified file count
 - Status bar shows: `main (3)` for branch + modified count
 
@@ -120,7 +135,12 @@ package.json          - Updated dependencies
 | `/api/workspaces/:id` | PUT/DELETE | Workspace CRUD |
 | `/api/workspaces/:id/sessions/:sid` | POST/DELETE | Add/remove session |
 | `/api/workspaces/:id/layout` | PUT | Save workspace layout |
-| `/api/k8s/context` | GET | Kubectl context + namespace |
+| `/api/k8s/context` | GET/POST | Get/switch kubectl context |
+| `/api/k8s/contexts` | GET | List all available contexts |
+| `/api/k8s/namespaces` | GET | List namespaces in current context |
+| `/api/k8s/namespace` | POST | Switch namespace |
+| `/api/k8s/pods` | GET | List pods in namespace |
+| `/api/k8s/pods/:name/logs` | GET | Get pod logs (supports SSE streaming) |
 | `/api/git/status` | GET | Git branch + modified count |
 | `/api/sessions/:id/export` | GET | Export session (md/json/html/txt) |
 
@@ -174,10 +194,10 @@ curl "http://localhost:32353/api/git/status?path=/home/tom/own/claude-code-web" 
 - [x] Grid layouts (2x2, 3x1, 3-columns, 3-rows)
 - [x] Save/restore split layouts per workspace
 
-### Phase 3 Remaining
-- [ ] K8s context switcher UI
-- [ ] Pod log streaming
-- [ ] Infrastructure status panel (AWS, Terraform, Docker)
+### Phase 3 - Mostly Complete!
+- [x] K8s context switcher UI
+- [x] Pod log streaming (with SSE)
+- [ ] Infrastructure status panel (AWS, Terraform, Docker) - Future
 
 ### Phase 4-5 (Future)
 - [ ] Multi-user support

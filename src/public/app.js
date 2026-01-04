@@ -194,12 +194,252 @@ class ClaudeCodeWebInterface {
             if (data.success) {
                 statusEl.classList.add('k8s');
                 statusEl.querySelector('.status-text').textContent = `${data.context}/${data.namespace}`;
+                statusEl.style.cursor = 'pointer';
+                statusEl.title = 'Click to switch context/namespace';
+
+                // Add click handler for context switcher
+                if (!statusEl.dataset.hasClickHandler) {
+                    statusEl.dataset.hasClickHandler = 'true';
+                    statusEl.addEventListener('click', () => this.showK8sSwitcher());
+                }
             } else {
                 statusEl.querySelector('.status-text').textContent = 'no cluster';
             }
         } catch (error) {
             statusEl.querySelector('.status-text').textContent = '--';
         }
+    }
+
+    async showK8sSwitcher() {
+        // Fetch contexts and namespaces
+        const [contextsRes, namespacesRes] = await Promise.all([
+            this.authFetch('/api/k8s/contexts'),
+            this.authFetch('/api/k8s/namespaces')
+        ]);
+
+        const contextsData = await contextsRes.json();
+        const namespacesData = await namespacesRes.json();
+
+        if (!contextsData.success) {
+            this.showError('Failed to load Kubernetes contexts');
+            return;
+        }
+
+        // Create modal
+        const modal = document.createElement('div');
+        modal.className = 'k8s-switcher-modal';
+        modal.innerHTML = `
+            <div class="k8s-switcher-content">
+                <div class="k8s-switcher-header">
+                    <h3>Kubernetes Context</h3>
+                    <button class="k8s-switcher-close">&times;</button>
+                </div>
+                <div class="k8s-switcher-section">
+                    <label>Context</label>
+                    <select id="k8sContextSelect">
+                        ${contextsData.contexts.map(c =>
+                            `<option value="${c.name}" ${c.current ? 'selected' : ''}>${c.name}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+                <div class="k8s-switcher-section">
+                    <label>Namespace</label>
+                    <select id="k8sNamespaceSelect">
+                        ${namespacesData.success ? namespacesData.namespaces.map(ns =>
+                            `<option value="${ns}" ${ns === namespacesData.current ? 'selected' : ''}>${ns}</option>`
+                        ).join('') : '<option>Loading...</option>'}
+                    </select>
+                </div>
+                <div class="k8s-switcher-actions">
+                    <button class="k8s-pods-btn">View Pods</button>
+                    <button class="k8s-apply-btn">Apply</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Close button
+        modal.querySelector('.k8s-switcher-close').addEventListener('click', () => {
+            document.body.removeChild(modal);
+        });
+
+        // Click outside to close
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                document.body.removeChild(modal);
+            }
+        });
+
+        // Context change -> refresh namespaces
+        const contextSelect = modal.querySelector('#k8sContextSelect');
+        const namespaceSelect = modal.querySelector('#k8sNamespaceSelect');
+
+        contextSelect.addEventListener('change', async () => {
+            const selectedContext = contextSelect.value;
+            // Switch context first to get namespaces for that context
+            await this.authFetch('/api/k8s/context', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ context: selectedContext })
+            });
+            // Refresh namespaces
+            const nsRes = await this.authFetch('/api/k8s/namespaces');
+            const nsData = await nsRes.json();
+            if (nsData.success) {
+                namespaceSelect.innerHTML = nsData.namespaces.map(ns =>
+                    `<option value="${ns}" ${ns === nsData.current ? 'selected' : ''}>${ns}</option>`
+                ).join('');
+            }
+            this.updateK8sStatus();
+        });
+
+        // Apply button
+        modal.querySelector('.k8s-apply-btn').addEventListener('click', async () => {
+            const namespace = namespaceSelect.value;
+            await this.authFetch('/api/k8s/namespace', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ namespace })
+            });
+            this.updateK8sStatus();
+            document.body.removeChild(modal);
+        });
+
+        // View pods button
+        modal.querySelector('.k8s-pods-btn')?.addEventListener('click', async () => {
+            document.body.removeChild(modal);
+            this.showPodViewer();
+        });
+    }
+
+    async showPodViewer() {
+        const response = await this.authFetch('/api/k8s/pods');
+        const data = await response.json();
+
+        const modal = document.createElement('div');
+        modal.className = 'k8s-switcher-modal';
+        modal.innerHTML = `
+            <div class="k8s-pods-content">
+                <div class="k8s-switcher-header">
+                    <h3>Pods</h3>
+                    <button class="k8s-switcher-close">&times;</button>
+                </div>
+                <div class="k8s-pods-list">
+                    ${data.success && data.pods.length > 0 ?
+                        data.pods.map(pod => `
+                            <div class="k8s-pod-item" data-pod="${pod.name}" data-ns="${pod.namespace}">
+                                <div class="k8s-pod-status ${pod.status.toLowerCase()}">${pod.status}</div>
+                                <div class="k8s-pod-info">
+                                    <div class="k8s-pod-name">${pod.name}</div>
+                                    <div class="k8s-pod-meta">${pod.ready} ready | ${pod.restarts} restarts</div>
+                                </div>
+                                <button class="k8s-pod-logs-btn" title="View Logs">Logs</button>
+                            </div>
+                        `).join('') :
+                        '<div class="k8s-no-pods">No pods found in current namespace</div>'
+                    }
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Close handlers
+        modal.querySelector('.k8s-switcher-close').addEventListener('click', () => {
+            document.body.removeChild(modal);
+        });
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) document.body.removeChild(modal);
+        });
+
+        // Log button handlers
+        modal.querySelectorAll('.k8s-pod-logs-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const item = btn.closest('.k8s-pod-item');
+                const podName = item.dataset.pod;
+                const namespace = item.dataset.ns;
+                document.body.removeChild(modal);
+                this.showPodLogs(podName, namespace);
+            });
+        });
+    }
+
+    async showPodLogs(podName, namespace) {
+        // Fetch initial logs
+        const response = await this.authFetch(`/api/k8s/pods/${podName}/logs?namespace=${namespace}&tail=200`);
+        const data = await response.json();
+
+        const modal = document.createElement('div');
+        modal.className = 'k8s-switcher-modal k8s-logs-modal';
+        modal.innerHTML = `
+            <div class="k8s-logs-content">
+                <div class="k8s-switcher-header">
+                    <h3>Logs: ${podName}</h3>
+                    <div class="k8s-logs-controls">
+                        <label>
+                            <input type="checkbox" id="k8sLogsFollow"> Follow
+                        </label>
+                        <button class="k8s-switcher-close">&times;</button>
+                    </div>
+                </div>
+                <div class="k8s-logs-output" id="k8sLogsOutput">
+                    <pre>${data.success ? this.escapeHtml(data.logs) : 'Failed to fetch logs: ' + (data.error || 'Unknown error')}</pre>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        const logsOutput = modal.querySelector('#k8sLogsOutput pre');
+        const followCheckbox = modal.querySelector('#k8sLogsFollow');
+        let eventSource = null;
+
+        // Follow checkbox handler
+        followCheckbox.addEventListener('change', () => {
+            if (followCheckbox.checked) {
+                // Start SSE stream
+                eventSource = new EventSource(`/api/k8s/pods/${podName}/logs?namespace=${namespace}&follow=true&tail=50`);
+
+                eventSource.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    if (data.line) {
+                        logsOutput.textContent += data.line + '\n';
+                        logsOutput.parentElement.scrollTop = logsOutput.parentElement.scrollHeight;
+                    }
+                    if (data.done) {
+                        eventSource.close();
+                    }
+                };
+
+                eventSource.onerror = () => {
+                    eventSource.close();
+                    followCheckbox.checked = false;
+                };
+            } else if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+        });
+
+        // Close handlers
+        const closeModal = () => {
+            if (eventSource) eventSource.close();
+            document.body.removeChild(modal);
+        };
+
+        modal.querySelector('.k8s-switcher-close').addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     async updateGitStatus(workingDir) {
