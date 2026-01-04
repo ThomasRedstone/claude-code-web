@@ -1,12 +1,13 @@
 # Development Progress
 
-> Last updated: 2026-01-04 - Advanced Split Layouts Complete!
-> Phases 1-3 + Split Layouts from ROADMAP.md implemented
+> Last updated: 2026-01-04 - Phases 1-3 Complete!
+> All major enhancements from ROADMAP.md implemented
 
-## Current Status: Multi-Pane Split Views Added
+## Current Status: K8s Integration & Split Layouts Complete
 
 ### Commits Made This Session
 ```
+d979d6b feat: add K8s context switcher and pod log streaming
 d355ccd feat: add advanced split layouts (vertical, grid, layout selector)
 755ee89 feat: add workspaces for session organization
 75b0b36 feat: add session export, k8s/git status bar, keyboard shortcuts
