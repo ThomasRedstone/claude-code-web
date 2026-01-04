@@ -118,10 +118,108 @@ class ClaudeCodeWebInterface {
         window.addEventListener('resize', () => {
             this.fitTerminal();
         });
-        
+
         window.addEventListener('beforeunload', () => {
             this.disconnect();
         });
+
+        // Keyboard shortcuts
+        window.addEventListener('keydown', (e) => {
+            // Ctrl+Shift+E - Export session
+            if (e.ctrlKey && e.shiftKey && e.key === 'E') {
+                e.preventDefault();
+                this.showExportDialog();
+            }
+            // Ctrl+K - Clear terminal
+            if (e.ctrlKey && e.key === 'k') {
+                e.preventDefault();
+                if (this.terminal) this.terminal.clear();
+            }
+        });
+    }
+
+    // Session export methods
+    async showExportDialog() {
+        if (!this.currentClaudeSessionId) {
+            this.showError('No active session to export');
+            return;
+        }
+
+        const format = prompt('Export format (markdown, json, html, txt):', 'markdown');
+        if (!format) return;
+
+        await this.exportSession(this.currentClaudeSessionId, format);
+    }
+
+    async exportSession(sessionId, format = 'markdown') {
+        try {
+            const response = await this.authFetch(`/api/sessions/${sessionId}/export?format=${format}`);
+            if (!response.ok) throw new Error('Export failed');
+
+            const blob = await response.blob();
+            const contentDisposition = response.headers.get('Content-Disposition');
+            const filename = contentDisposition?.match(/filename="(.+)"/)?.[1] || `session-export.${format === 'markdown' ? 'md' : format}`;
+
+            // Download the file
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Export failed:', error);
+            this.showError('Failed to export session');
+        }
+    }
+
+    // Status bar updates
+    async updateStatusBar() {
+        this.updateK8sStatus();
+        if (this.currentFolderPath) {
+            this.updateGitStatus(this.currentFolderPath);
+        }
+    }
+
+    async updateK8sStatus() {
+        const statusEl = document.getElementById('k8sStatus');
+        if (!statusEl) return;
+
+        try {
+            const response = await this.authFetch('/api/k8s/context');
+            const data = await response.json();
+
+            if (data.success) {
+                statusEl.classList.add('k8s');
+                statusEl.querySelector('.status-text').textContent = `${data.context}/${data.namespace}`;
+            } else {
+                statusEl.querySelector('.status-text').textContent = 'no cluster';
+            }
+        } catch (error) {
+            statusEl.querySelector('.status-text').textContent = '--';
+        }
+    }
+
+    async updateGitStatus(workingDir) {
+        const statusEl = document.getElementById('gitStatus');
+        if (!statusEl) return;
+
+        try {
+            const response = await this.authFetch(`/api/git/status?path=${encodeURIComponent(workingDir)}`);
+            const data = await response.json();
+
+            if (data.success && data.isRepo) {
+                statusEl.classList.add('git');
+                const modifiedText = data.modified > 0 ? ` (${data.modified})` : '';
+                statusEl.querySelector('.status-text').textContent = `${data.branch}${modifiedText}`;
+            } else {
+                statusEl.querySelector('.status-text').textContent = 'not a repo';
+            }
+        } catch (error) {
+            statusEl.querySelector('.status-text').textContent = '--';
+        }
     }
 
     async loadConfig() {
@@ -1166,6 +1264,9 @@ class ClaudeCodeWebInterface {
 
         // Load mani tags on startup
         this.loadManiTags();
+
+        // Update status bar
+        this.updateStatusBar();
     }
 
     async loadManiTags() {

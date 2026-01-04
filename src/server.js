@@ -134,6 +134,80 @@ class ClaudeCodeWebServer {
     return { valid: true, path: resolvedPath };
   }
 
+  // Strip ANSI escape codes from text
+  stripAnsi(text) {
+    return text.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '');
+  }
+
+  // Export session in various formats
+  exportSession(session, format) {
+    const rawOutput = session.outputBuffer.join('');
+    const cleanOutput = this.stripAnsi(rawOutput);
+    const metadata = {
+      sessionId: session.id,
+      sessionName: session.name,
+      workingDir: session.workingDir,
+      agent: session.agent || 'claude',
+      createdAt: session.createdAt,
+      exportedAt: new Date().toISOString()
+    };
+
+    switch (format) {
+      case 'json':
+        return JSON.stringify({
+          metadata,
+          output: cleanOutput,
+          rawOutput: rawOutput
+        }, null, 2);
+
+      case 'html':
+        return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Session: ${metadata.sessionName}</title>
+  <style>
+    body { font-family: monospace; background: #1a1a2e; color: #eee; padding: 20px; }
+    .metadata { background: #16213e; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+    .metadata h2 { margin: 0 0 10px 0; color: #e94560; }
+    .metadata p { margin: 5px 0; color: #aaa; }
+    .output { background: #0f0f1a; padding: 20px; border-radius: 8px; white-space: pre-wrap; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <div class="metadata">
+    <h2>${metadata.sessionName}</h2>
+    <p><strong>Working Directory:</strong> ${metadata.workingDir}</p>
+    <p><strong>Agent:</strong> ${metadata.agent}</p>
+    <p><strong>Created:</strong> ${metadata.createdAt}</p>
+    <p><strong>Exported:</strong> ${metadata.exportedAt}</p>
+  </div>
+  <div class="output">${cleanOutput.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+</body>
+</html>`;
+
+      case 'txt':
+        return cleanOutput;
+
+      case 'markdown':
+      default:
+        return `# Session: ${metadata.sessionName}
+
+## Metadata
+- **Working Directory:** \`${metadata.workingDir}\`
+- **Agent:** ${metadata.agent}
+- **Created:** ${metadata.createdAt}
+- **Exported:** ${metadata.exportedAt}
+
+## Output
+
+\`\`\`
+${cleanOutput}
+\`\`\`
+`;
+    }
+  }
+
   setupExpress() {
     this.app.use(cors());
     this.app.use(express.json());
@@ -628,6 +702,79 @@ class ClaudeCodeWebServer {
       } catch (error) {
         res.status(500).json({
           error: 'Failed to record template usage',
+          message: error.message
+        });
+      }
+    });
+
+    // Kubernetes context endpoint
+    this.app.get('/api/k8s/context', async (req, res) => {
+      try {
+        const { execSync } = require('child_process');
+        const context = execSync('kubectl config current-context 2>/dev/null', { encoding: 'utf8' }).trim();
+        const namespace = execSync('kubectl config view --minify -o jsonpath="{..namespace}" 2>/dev/null', { encoding: 'utf8' }).trim() || 'default';
+        res.json({ success: true, context, namespace });
+      } catch (error) {
+        res.json({ success: false, context: null, namespace: null, error: 'kubectl not available' });
+      }
+    });
+
+    // Git status endpoint for current session working dir
+    this.app.get('/api/git/status', async (req, res) => {
+      const { path: workingDir } = req.query;
+      if (!workingDir) {
+        return res.status(400).json({ error: 'Working directory required' });
+      }
+      try {
+        const { execSync } = require('child_process');
+        const branch = execSync('git rev-parse --abbrev-ref HEAD 2>/dev/null', { cwd: workingDir, encoding: 'utf8' }).trim();
+        const status = execSync('git status --porcelain 2>/dev/null', { cwd: workingDir, encoding: 'utf8' });
+        const modified = status.split('\n').filter(l => l.trim()).length;
+        res.json({ success: true, branch, modified, isRepo: true });
+      } catch (error) {
+        res.json({ success: false, isRepo: false });
+      }
+    });
+
+    // Session export endpoint
+    this.app.get('/api/sessions/:sessionId/export', (req, res) => {
+      try {
+        const { sessionId } = req.params;
+        const { format = 'markdown' } = req.query;
+
+        const session = this.claudeSessions.get(sessionId);
+        if (!session) {
+          return res.status(404).json({ error: 'Session not found' });
+        }
+
+        const exportData = this.exportSession(session, format);
+
+        // Set appropriate headers based on format
+        const filename = `session-${session.name || sessionId}-${new Date().toISOString().split('T')[0]}`;
+
+        switch (format) {
+          case 'json':
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}.json"`);
+            break;
+          case 'html':
+            res.setHeader('Content-Type', 'text/html');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}.html"`);
+            break;
+          case 'txt':
+            res.setHeader('Content-Type', 'text/plain');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}.txt"`);
+            break;
+          case 'markdown':
+          default:
+            res.setHeader('Content-Type', 'text/markdown');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}.md"`);
+        }
+
+        res.send(exportData);
+      } catch (error) {
+        res.status(500).json({
+          error: 'Failed to export session',
           message: error.message
         });
       }

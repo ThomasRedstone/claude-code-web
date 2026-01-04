@@ -104,6 +104,24 @@
         </div>
 
         <main class="main">
+            <div class="status-bar" id="statusBar">
+                <div class="status-item" id="gitStatus" title="Git status">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="4"/><line x1="1.05" y1="12" x2="7" y2="12"/><line x1="17.01" y1="12" x2="22.96" y2="12"/>
+                    </svg>
+                    <span class="status-text">--</span>
+                </div>
+                <div class="status-item" id="k8sStatus" title="Kubernetes context">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                    </svg>
+                    <span class="status-text">--</span>
+                </div>
+                <div class="status-item status-shortcuts" title="Keyboard shortcuts">
+                    <span>Ctrl+Shift+E: Export</span>
+                    <span>Ctrl+K: Clear</span>
+                </div>
+            </div>
             <div class="terminal-container" id="terminalContainer" data-view="single">
                 <div class="terminal-wrapper">
                     <div id="terminal"></div>
