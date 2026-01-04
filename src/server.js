@@ -11,6 +11,7 @@ const CodexBridge = require('./codex-bridge');
 const AgentBridge = require('./agent-bridge');
 const SessionStore = require('./utils/session-store');
 const ManiIntegration = require('./utils/mani');
+const TemplateStore = require('./utils/template-store');
 const UsageReader = require('./usage-reader');
 const UsageAnalytics = require('./usage-analytics');
 
@@ -37,6 +38,7 @@ class ClaudeCodeWebServer {
     this.agentBridge = new AgentBridge();
     this.sessionStore = new SessionStore();
     this.maniIntegration = new ManiIntegration();
+    this.templateStore = new TemplateStore();
     this.usageReader = new UsageReader(this.sessionDurationHours);
     this.usageAnalytics = new UsageAnalytics({
       sessionDurationHours: this.sessionDurationHours,
@@ -523,6 +525,109 @@ class ClaudeCodeWebServer {
       } catch (error) {
         res.status(500).json({
           error: 'Failed to load mani tags',
+          message: error.message
+        });
+      }
+    });
+
+    // Template endpoints
+    this.app.get('/api/templates', async (req, res) => {
+      try {
+        const templates = await this.templateStore.getTemplates();
+        const builtinTemplates = TemplateStore.BUILTIN_TEMPLATES;
+        res.json({
+          success: true,
+          templates,
+          builtin: builtinTemplates
+        });
+      } catch (error) {
+        res.status(500).json({
+          error: 'Failed to load templates',
+          message: error.message
+        });
+      }
+    });
+
+    this.app.get('/api/templates/frequent', async (req, res) => {
+      try {
+        const limit = parseInt(req.query.limit) || 5;
+        const templates = await this.templateStore.getFrequentTemplates(limit);
+        res.json({
+          success: true,
+          templates
+        });
+      } catch (error) {
+        res.status(500).json({
+          error: 'Failed to load frequent templates',
+          message: error.message
+        });
+      }
+    });
+
+    this.app.get('/api/templates/:id', async (req, res) => {
+      try {
+        const template = await this.templateStore.getTemplate(req.params.id);
+        if (!template) {
+          return res.status(404).json({ error: 'Template not found' });
+        }
+        res.json({ success: true, template });
+      } catch (error) {
+        res.status(500).json({
+          error: 'Failed to get template',
+          message: error.message
+        });
+      }
+    });
+
+    this.app.post('/api/templates', async (req, res) => {
+      try {
+        const template = await this.templateStore.createTemplate(req.body);
+        res.json({ success: true, template });
+      } catch (error) {
+        res.status(500).json({
+          error: 'Failed to create template',
+          message: error.message
+        });
+      }
+    });
+
+    this.app.put('/api/templates/:id', async (req, res) => {
+      try {
+        const template = await this.templateStore.updateTemplate(req.params.id, req.body);
+        res.json({ success: true, template });
+      } catch (error) {
+        if (error.message.includes('not found')) {
+          return res.status(404).json({ error: error.message });
+        }
+        res.status(500).json({
+          error: 'Failed to update template',
+          message: error.message
+        });
+      }
+    });
+
+    this.app.delete('/api/templates/:id', async (req, res) => {
+      try {
+        await this.templateStore.deleteTemplate(req.params.id);
+        res.json({ success: true });
+      } catch (error) {
+        if (error.message.includes('not found')) {
+          return res.status(404).json({ error: error.message });
+        }
+        res.status(500).json({
+          error: 'Failed to delete template',
+          message: error.message
+        });
+      }
+    });
+
+    this.app.post('/api/templates/:id/use', async (req, res) => {
+      try {
+        await this.templateStore.recordUsage(req.params.id);
+        res.json({ success: true });
+      } catch (error) {
+        res.status(500).json({
+          error: 'Failed to record template usage',
           message: error.message
         });
       }

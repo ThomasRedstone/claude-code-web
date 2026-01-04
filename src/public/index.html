@@ -243,6 +243,7 @@
                 <div class="folder-browser-tabs">
                     <button class="folder-tab active" data-tab="browse">Browse</button>
                     <button class="folder-tab" data-tab="mani">Mani Projects</button>
+                    <button class="folder-tab" data-tab="templates">Templates</button>
                 </div>
                 <div class="folder-browser-body" id="folderBrowsePane">
                     <div class="folder-path-bar">
@@ -303,6 +304,41 @@
                         <span class="mani-project-count" id="maniProjectCount">0 projects</span>
                         <div class="folder-browser-buttons">
                             <button class="btn btn-secondary" id="cancelManiBtn">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+                <!-- Templates Pane -->
+                <div class="folder-browser-body" id="templatesPane" style="display: none;">
+                    <div class="templates-header">
+                        <span class="templates-section-title">Quick Start Templates</span>
+                        <button class="btn btn-small btn-secondary" id="saveAsTemplateBtn" title="Save current folder as template">
+                            + Save Template
+                        </button>
+                    </div>
+                    <div class="folder-list-container">
+                        <div class="templates-section">
+                            <div class="templates-section-label">Built-in</div>
+                            <div class="folder-list" id="builtinTemplateList">
+                                <!-- Built-in templates -->
+                            </div>
+                        </div>
+                        <div class="templates-section" id="customTemplatesSection">
+                            <div class="templates-section-label">Your Templates</div>
+                            <div class="folder-list" id="customTemplateList">
+                                <!-- Custom templates -->
+                            </div>
+                        </div>
+                        <div class="templates-section" id="frequentTemplatesSection" style="display: none;">
+                            <div class="templates-section-label">Frequently Used</div>
+                            <div class="folder-list" id="frequentTemplateList">
+                                <!-- Frequent templates -->
+                            </div>
+                        </div>
+                    </div>
+                    <div class="folder-browser-footer">
+                        <span class="template-count" id="templateCount">0 templates</span>
+                        <div class="folder-browser-buttons">
+                            <button class="btn btn-secondary" id="cancelTemplatesBtn">Cancel</button>
                         </div>
                     </div>
                 </div>

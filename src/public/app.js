@@ -1108,7 +1108,10 @@ class ClaudeCodeWebInterface {
         const tabs = document.querySelectorAll('.folder-tab');
         const browsePane = document.getElementById('folderBrowsePane');
         const maniPane = document.getElementById('maniProjectsPane');
+        const templatesPane = document.getElementById('templatesPane');
         const cancelManiBtn = document.getElementById('cancelManiBtn');
+        const cancelTemplatesBtn = document.getElementById('cancelTemplatesBtn');
+        const saveAsTemplateBtn = document.getElementById('saveAsTemplateBtn');
         const searchInput = document.getElementById('maniSearchInput');
         const tagFilter = document.getElementById('maniTagFilter');
 
@@ -1118,20 +1121,33 @@ class ClaudeCodeWebInterface {
                 tabs.forEach(t => t.classList.remove('active'));
                 tab.classList.add('active');
 
+                browsePane.style.display = 'none';
+                maniPane.style.display = 'none';
+                templatesPane.style.display = 'none';
+
                 if (tab.dataset.tab === 'browse') {
                     browsePane.style.display = '';
-                    maniPane.style.display = 'none';
                 } else if (tab.dataset.tab === 'mani') {
-                    browsePane.style.display = 'none';
                     maniPane.style.display = '';
                     this.loadManiProjects();
+                } else if (tab.dataset.tab === 'templates') {
+                    templatesPane.style.display = '';
+                    this.loadTemplates();
                 }
             });
         });
 
-        // Mani cancel button
+        // Cancel buttons
         if (cancelManiBtn) {
             cancelManiBtn.addEventListener('click', () => this.closeFolderBrowser());
+        }
+        if (cancelTemplatesBtn) {
+            cancelTemplatesBtn.addEventListener('click', () => this.closeFolderBrowser());
+        }
+
+        // Save as template button
+        if (saveAsTemplateBtn) {
+            saveAsTemplateBtn.addEventListener('click', () => this.showSaveTemplateDialog());
         }
 
         // Mani search
@@ -1284,6 +1300,177 @@ class ClaudeCodeWebInterface {
             }
         } catch (error) {
             console.error('Failed to select mani project:', error);
+            this.showError(error.message);
+        }
+    }
+
+    // Template methods
+    async loadTemplates() {
+        const builtinList = document.getElementById('builtinTemplateList');
+        const customList = document.getElementById('customTemplateList');
+        const customSection = document.getElementById('customTemplatesSection');
+        const countDisplay = document.getElementById('templateCount');
+
+        try {
+            const response = await this.authFetch('/api/templates');
+            if (!response.ok) throw new Error('Failed to load templates');
+
+            const data = await response.json();
+
+            // Render built-in templates
+            builtinList.innerHTML = '';
+            (data.builtin || []).forEach(template => {
+                builtinList.appendChild(this.createTemplateItem(template, true));
+            });
+
+            // Render custom templates
+            customList.innerHTML = '';
+            if (data.templates && data.templates.length > 0) {
+                customSection.style.display = '';
+                data.templates.forEach(template => {
+                    customList.appendChild(this.createTemplateItem(template, false));
+                });
+            } else {
+                customSection.style.display = 'none';
+            }
+
+            const totalCount = (data.builtin?.length || 0) + (data.templates?.length || 0);
+            countDisplay.textContent = `${totalCount} templates`;
+        } catch (error) {
+            console.error('Failed to load templates:', error);
+            builtinList.innerHTML = `<div class="template-empty">Failed to load templates</div>`;
+        }
+    }
+
+    createTemplateItem(template, isBuiltin) {
+        const item = document.createElement('div');
+        item.className = `template-item${isBuiltin ? ' builtin' : ''}`;
+
+        const typeClass = template.type || 'claude';
+        const typeName = template.type === 'agent' ? 'Cursor' :
+                         template.type === 'codex' ? 'Codex' : 'Claude';
+
+        item.innerHTML = `
+            <div class="template-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                    <line x1="9" y1="9" x2="15" y2="9"/>
+                    <line x1="9" y1="13" x2="15" y2="13"/>
+                    <line x1="9" y1="17" x2="12" y2="17"/>
+                </svg>
+            </div>
+            <div class="template-info">
+                <div class="template-name">${template.name}</div>
+                ${template.description ? `<div class="template-desc">${template.description}</div>` : ''}
+                ${template.workingDir ? `<div class="template-path">${template.workingDir}</div>` : ''}
+            </div>
+            <span class="template-type ${typeClass}">${typeName}</span>
+            ${!isBuiltin ? `
+                <div class="template-actions">
+                    <button class="template-action-btn delete" title="Delete template">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        </svg>
+                    </button>
+                </div>
+            ` : ''}
+        `;
+
+        // Click to use template
+        item.addEventListener('click', (e) => {
+            if (!e.target.closest('.template-action-btn')) {
+                this.useTemplate(template);
+            }
+        });
+
+        // Delete button
+        const deleteBtn = item.querySelector('.template-action-btn.delete');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.deleteTemplate(template.id);
+            });
+        }
+
+        return item;
+    }
+
+    async useTemplate(template) {
+        try {
+            // Record usage if it's a custom template
+            if (!template.builtin) {
+                await this.authFetch(`/api/templates/${template.id}/use`, { method: 'POST' });
+            }
+
+            // If template has a working directory, set it
+            if (template.workingDir) {
+                const response = await this.authFetch('/api/set-working-dir', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: template.workingDir })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to set working directory');
+                }
+
+                this.currentFolderPath = template.workingDir;
+            }
+
+            this.closeFolderBrowser();
+
+            // Start the appropriate session type
+            const options = template.options || {};
+
+            if (template.type === 'codex') {
+                this.startCodexSession(options);
+            } else if (template.type === 'agent') {
+                this.startAgentSession(options);
+            } else {
+                this.startClaudeSession(options);
+            }
+        } catch (error) {
+            console.error('Failed to use template:', error);
+            this.showError(error.message);
+        }
+    }
+
+    async deleteTemplate(id) {
+        if (!confirm('Delete this template?')) return;
+
+        try {
+            const response = await this.authFetch(`/api/templates/${id}`, { method: 'DELETE' });
+            if (!response.ok) throw new Error('Failed to delete template');
+
+            this.loadTemplates(); // Refresh the list
+        } catch (error) {
+            console.error('Failed to delete template:', error);
+            this.showError(error.message);
+        }
+    }
+
+    async showSaveTemplateDialog() {
+        const name = prompt('Template name:', this.currentFolderPath?.split('/').pop() || 'New Template');
+        if (!name) return;
+
+        try {
+            const response = await this.authFetch('/api/templates', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name,
+                    workingDir: this.currentFolderPath,
+                    type: 'claude'
+                })
+            });
+
+            if (!response.ok) throw new Error('Failed to save template');
+
+            this.loadTemplates();
+            this.showError('Template saved!'); // Use showError for now as success notification
+        } catch (error) {
+            console.error('Failed to save template:', error);
             this.showError(error.message);
         }
     }
