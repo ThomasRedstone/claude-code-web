@@ -1442,6 +1442,153 @@ body {
     border-top: 1px solid var(--border);
 }
 
+/* Folder browser tabs for mani integration */
+.folder-browser-tabs {
+    display: flex;
+    gap: 0;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0;
+}
+
+.folder-tab {
+    padding: 12px 20px;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.15s ease;
+}
+
+.folder-tab:hover {
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.folder-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+/* Mani project styles */
+.mani-search-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.mani-search-input {
+    flex: 1;
+    padding: 10px 14px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 14px;
+}
+
+.mani-search-input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.mani-tag-filter {
+    padding: 10px 14px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 14px;
+    min-width: 120px;
+    cursor: pointer;
+}
+
+.mani-tag-filter:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.mani-project-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.mani-project-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.mani-project-icon {
+    width: 20px;
+    height: 20px;
+    color: var(--accent);
+    flex-shrink: 0;
+}
+
+.mani-project-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.mani-project-name {
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 2px;
+}
+
+.mani-project-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mani-project-path {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: monospace;
+}
+
+.mani-project-tags {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.mani-tag {
+    padding: 2px 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.mani-project-count {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.mani-unavailable {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+}
+
+.mani-unavailable-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
 .checkbox-label {
     display: flex;
     align-items: center;

@@ -240,7 +240,11 @@
                 <div class="modal-header">
                     <h2>Select Working Directory</h2>
                 </div>
-                <div class="folder-browser-body">
+                <div class="folder-browser-tabs">
+                    <button class="folder-tab active" data-tab="browse">Browse</button>
+                    <button class="folder-tab" data-tab="mani">Mani Projects</button>
+                </div>
+                <div class="folder-browser-body" id="folderBrowsePane">
                     <div class="folder-path-bar">
                         <button class="btn-icon" id="folderUpBtn" title="Go to parent directory">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -279,6 +283,26 @@
                         <div class="folder-browser-buttons">
                             <button class="btn btn-secondary" id="cancelFolderBtn">Cancel</button>
                             <button class="btn btn-primary" id="selectFolderBtn">Select This Folder</button>
+                        </div>
+                    </div>
+                </div>
+                <!-- Mani Projects Pane -->
+                <div class="folder-browser-body" id="maniProjectsPane" style="display: none;">
+                    <div class="mani-search-bar">
+                        <input type="text" class="mani-search-input" id="maniSearchInput" placeholder="Search projects...">
+                        <select class="mani-tag-filter" id="maniTagFilter">
+                            <option value="">All tags</option>
+                        </select>
+                    </div>
+                    <div class="folder-list-container">
+                        <div class="folder-list" id="maniProjectList">
+                            <!-- Projects will be dynamically added here -->
+                        </div>
+                    </div>
+                    <div class="folder-browser-footer">
+                        <span class="mani-project-count" id="maniProjectCount">0 projects</span>
+                        <div class="folder-browser-buttons">
+                            <button class="btn btn-secondary" id="cancelManiBtn">Cancel</button>
                         </div>
                     </div>
                 </div>

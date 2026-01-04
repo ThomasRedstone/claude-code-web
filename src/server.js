@@ -10,6 +10,7 @@ const ClaudeBridge = require('./claude-bridge');
 const CodexBridge = require('./codex-bridge');
 const AgentBridge = require('./agent-bridge');
 const SessionStore = require('./utils/session-store');
+const ManiIntegration = require('./utils/mani');
 const UsageReader = require('./usage-reader');
 const UsageAnalytics = require('./usage-analytics');
 
@@ -35,6 +36,7 @@ class ClaudeCodeWebServer {
     this.codexBridge = new CodexBridge();
     this.agentBridge = new AgentBridge();
     this.sessionStore = new SessionStore();
+    this.maniIntegration = new ManiIntegration();
     this.usageReader = new UsageReader(this.sessionDurationHours);
     this.usageAnalytics = new UsageAnalytics({
       sessionDurationHours: this.sessionDurationHours,
@@ -470,9 +472,58 @@ class ClaudeCodeWebServer {
           workingDir: this.selectedWorkingDir 
         });
       } catch (error) {
-        res.status(500).json({ 
+        res.status(500).json({
           error: 'Failed to set working directory',
-          message: error.message 
+          message: error.message
+        });
+      }
+    });
+
+    // Mani integration endpoints
+    this.app.get('/api/mani/status', (req, res) => {
+      res.json({
+        available: this.maniIntegration.isAvailable(),
+        configPath: this.maniIntegration.configPath
+      });
+    });
+
+    this.app.get('/api/mani/projects', (req, res) => {
+      try {
+        const { tags, search } = req.query;
+        const options = {};
+
+        if (tags) {
+          options.tags = tags.split(',').map(t => t.trim());
+        }
+        if (search) {
+          options.search = search;
+        }
+
+        const projects = this.maniIntegration.getProjects(options);
+        res.json({
+          success: true,
+          projects,
+          total: projects.length
+        });
+      } catch (error) {
+        res.status(500).json({
+          error: 'Failed to load mani projects',
+          message: error.message
+        });
+      }
+    });
+
+    this.app.get('/api/mani/tags', (req, res) => {
+      try {
+        const tags = this.maniIntegration.getTags();
+        res.json({
+          success: true,
+          tags
+        });
+      } catch (error) {
+        res.status(500).json({
+          error: 'Failed to load mani tags',
+          message: error.message
         });
       }
     });

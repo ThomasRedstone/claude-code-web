@@ -1074,7 +1074,7 @@ class ClaudeCodeWebInterface {
         const confirmCreateBtn = document.getElementById('confirmCreateFolderBtn');
         const cancelCreateBtn = document.getElementById('cancelCreateFolderBtn');
         const newFolderInput = document.getElementById('newFolderNameInput');
-        
+
         upBtn.addEventListener('click', () => this.navigateToParent());
         homeBtn.addEventListener('click', () => this.navigateToHome());
         selectBtn.addEventListener('click', () => this.selectCurrentFolder());
@@ -1083,7 +1083,7 @@ class ClaudeCodeWebInterface {
         createFolderBtn.addEventListener('click', () => this.showCreateFolderInput());
         confirmCreateBtn.addEventListener('click', () => this.createFolder());
         cancelCreateBtn.addEventListener('click', () => this.hideCreateFolderInput());
-        
+
         // Allow Enter key to create folder
         newFolderInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
@@ -1092,13 +1092,200 @@ class ClaudeCodeWebInterface {
                 this.hideCreateFolderInput();
             }
         });
-        
+
         // Close modal when clicking outside
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
                 this.closeFolderBrowser();
             }
         });
+
+        // Setup mani integration tabs
+        this.setupManiIntegration();
+    }
+
+    setupManiIntegration() {
+        const tabs = document.querySelectorAll('.folder-tab');
+        const browsePane = document.getElementById('folderBrowsePane');
+        const maniPane = document.getElementById('maniProjectsPane');
+        const cancelManiBtn = document.getElementById('cancelManiBtn');
+        const searchInput = document.getElementById('maniSearchInput');
+        const tagFilter = document.getElementById('maniTagFilter');
+
+        // Tab switching
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+
+                if (tab.dataset.tab === 'browse') {
+                    browsePane.style.display = '';
+                    maniPane.style.display = 'none';
+                } else if (tab.dataset.tab === 'mani') {
+                    browsePane.style.display = 'none';
+                    maniPane.style.display = '';
+                    this.loadManiProjects();
+                }
+            });
+        });
+
+        // Mani cancel button
+        if (cancelManiBtn) {
+            cancelManiBtn.addEventListener('click', () => this.closeFolderBrowser());
+        }
+
+        // Mani search
+        if (searchInput) {
+            let searchTimeout;
+            searchInput.addEventListener('input', () => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => this.loadManiProjects(), 300);
+            });
+        }
+
+        // Mani tag filter
+        if (tagFilter) {
+            tagFilter.addEventListener('change', () => this.loadManiProjects());
+        }
+
+        // Load mani tags on startup
+        this.loadManiTags();
+    }
+
+    async loadManiTags() {
+        try {
+            const response = await this.authFetch('/api/mani/tags');
+            if (!response.ok) return;
+
+            const data = await response.json();
+            const tagFilter = document.getElementById('maniTagFilter');
+
+            if (tagFilter && data.tags) {
+                // Keep the "All tags" option
+                tagFilter.innerHTML = '<option value="">All tags</option>';
+                data.tags.forEach(tag => {
+                    const option = document.createElement('option');
+                    option.value = tag;
+                    option.textContent = tag;
+                    tagFilter.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Failed to load mani tags:', error);
+        }
+    }
+
+    async loadManiProjects() {
+        const projectList = document.getElementById('maniProjectList');
+        const countDisplay = document.getElementById('maniProjectCount');
+        const searchInput = document.getElementById('maniSearchInput');
+        const tagFilter = document.getElementById('maniTagFilter');
+
+        try {
+            // Check if mani is available
+            const statusResponse = await this.authFetch('/api/mani/status');
+            const status = await statusResponse.json();
+
+            if (!status.available) {
+                projectList.innerHTML = `
+                    <div class="mani-unavailable">
+                        <div class="mani-unavailable-icon">📁</div>
+                        <p>Mani configuration not found</p>
+                        <p style="font-size: 12px; margin-top: 8px;">
+                            Expected at: ${status.configPath}
+                        </p>
+                    </div>
+                `;
+                countDisplay.textContent = 'Mani not configured';
+                return;
+            }
+
+            // Build query params
+            const params = new URLSearchParams();
+            if (searchInput?.value) {
+                params.append('search', searchInput.value);
+            }
+            if (tagFilter?.value) {
+                params.append('tags', tagFilter.value);
+            }
+
+            const response = await this.authFetch(`/api/mani/projects?${params}`);
+            if (!response.ok) throw new Error('Failed to load projects');
+
+            const data = await response.json();
+
+            projectList.innerHTML = '';
+            countDisplay.textContent = `${data.total} projects`;
+
+            if (data.projects.length === 0) {
+                projectList.innerHTML = `
+                    <div class="mani-unavailable">
+                        <p>No projects found</p>
+                    </div>
+                `;
+                return;
+            }
+
+            data.projects.forEach(project => {
+                const item = document.createElement('div');
+                item.className = 'mani-project-item';
+                item.innerHTML = `
+                    <svg class="mani-project-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    <div class="mani-project-info">
+                        <div class="mani-project-name">${project.name}</div>
+                        ${project.description ? `<div class="mani-project-desc">${project.description}</div>` : ''}
+                        <div class="mani-project-path">${project.relativePath || project.path}</div>
+                    </div>
+                    <div class="mani-project-tags">
+                        ${project.tags.map(tag => `<span class="mani-tag">${tag}</span>`).join('')}
+                    </div>
+                `;
+                item.addEventListener('click', () => this.selectManiProject(project));
+                projectList.appendChild(item);
+            });
+        } catch (error) {
+            console.error('Failed to load mani projects:', error);
+            projectList.innerHTML = `
+                <div class="mani-unavailable">
+                    <p>Failed to load projects</p>
+                    <p style="font-size: 12px;">${error.message}</p>
+                </div>
+            `;
+        }
+    }
+
+    async selectManiProject(project) {
+        try {
+            // Set the working directory to the project path
+            const response = await this.authFetch('/api/set-working-dir', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: project.path })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || 'Failed to set working directory');
+            }
+
+            this.currentFolderPath = project.path;
+            this.closeFolderBrowser();
+
+            // If we're creating a new session, proceed with that
+            if (this.isCreatingNewSession) {
+                this.isCreatingNewSession = false;
+                this.showNewSessionModal();
+            } else {
+                // Otherwise just connect/show start prompt
+                await this.connect();
+                this.showOverlay('startPrompt');
+            }
+        } catch (error) {
+            console.error('Failed to select mani project:', error);
+            this.showError(error.message);
+        }
     }
 
     async showFolderBrowser() {
