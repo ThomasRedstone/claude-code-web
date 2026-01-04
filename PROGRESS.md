@@ -7,7 +7,7 @@
 
 ### Commits Made This Session
 ```
-[pending] feat: add advanced split layouts (vertical, grid, layout selector)
+d355ccd feat: add advanced split layouts (vertical, grid, layout selector)
 755ee89 feat: add workspaces for session organization
 75b0b36 feat: add session export, k8s/git status bar, keyboard shortcuts
 aa2e6e4 feat: add session templates for quick-launch presets
