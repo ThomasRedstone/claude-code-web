@@ -93,6 +93,16 @@ aa2e6e4 feat: add session templates for quick-launch presets
 - `/api/git/status` - Get branch and modified file count
 - Status bar shows: `main (3)` for branch + modified count
 
+#### 3.5 Docker Integration ✅
+- Docker status in status bar: `running/total` containers
+- Click to open container viewer modal
+- `/api/docker/status` - Get Docker daemon info
+- `/api/docker/containers` - List containers with status
+- `/api/docker/containers/:id/:action` - Start/stop/restart containers
+- `/api/docker/containers/:id/logs` - View logs (one-time or SSE streaming)
+- Container actions: Start, Stop, Restart, View Logs
+- Color-coded status: Running (green), Exited (gray), Paused (yellow)
+
 #### Keyboard Shortcuts ✅
 - Ctrl+Shift+E: Export session
 - Ctrl+K: Clear terminal
@@ -142,6 +152,10 @@ package.json          - Updated dependencies
 | `/api/k8s/namespace` | POST | Switch namespace |
 | `/api/k8s/pods` | GET | List pods in namespace |
 | `/api/k8s/pods/:name/logs` | GET | Get pod logs (supports SSE streaming) |
+| `/api/docker/status` | GET | Docker daemon info |
+| `/api/docker/containers` | GET | List containers |
+| `/api/docker/containers/:id/:action` | POST | Start/stop/restart container |
+| `/api/docker/containers/:id/logs` | GET | Container logs (supports SSE) |
 | `/api/git/status` | GET | Git branch + modified count |
 | `/api/sessions/:id/export` | GET | Export session (md/json/html/txt) |
 
@@ -195,10 +209,12 @@ curl "http://localhost:32353/api/git/status?path=/home/tom/own/claude-code-web" 
 - [x] Grid layouts (2x2, 3x1, 3-columns, 3-rows)
 - [x] Save/restore split layouts per workspace
 
-### Phase 3 - Mostly Complete!
+### Phase 3 - Complete!
 - [x] K8s context switcher UI
 - [x] Pod log streaming (with SSE)
-- [ ] Infrastructure status panel (AWS, Terraform, Docker) - Future
+- [x] Docker container management
+- [ ] Terraform state display - Future
+- [ ] AWS status panel - Future
 
 ### Phase 4-5 (Future)
 - [ ] Multi-user support

@@ -863,6 +863,117 @@ ${cleanOutput}
       }
     });
 
+    // Docker status endpoint
+    this.app.get('/api/docker/status', async (req, res) => {
+      try {
+        const { execSync } = require('child_process');
+        const version = execSync('docker info --format "{{.ServerVersion}}" 2>/dev/null', { encoding: 'utf8' }).trim();
+        const containersRunning = parseInt(execSync('docker info --format "{{.ContainersRunning}}" 2>/dev/null', { encoding: 'utf8' }).trim()) || 0;
+        const containersPaused = parseInt(execSync('docker info --format "{{.ContainersPaused}}" 2>/dev/null', { encoding: 'utf8' }).trim()) || 0;
+        const containersStopped = parseInt(execSync('docker info --format "{{.ContainersStopped}}" 2>/dev/null', { encoding: 'utf8' }).trim()) || 0;
+        res.json({
+          success: true,
+          version,
+          containers: { running: containersRunning, paused: containersPaused, stopped: containersStopped }
+        });
+      } catch (error) {
+        res.json({ success: false, error: 'Docker not available' });
+      }
+    });
+
+    // List Docker containers
+    this.app.get('/api/docker/containers', async (req, res) => {
+      try {
+        const { execSync } = require('child_process');
+        const { all } = req.query;
+        const flag = all === 'true' ? '-a' : '';
+        const output = execSync(`docker ps ${flag} --format '{{json .}}' 2>/dev/null`, { encoding: 'utf8' });
+        const containers = output.trim().split('\n').filter(Boolean).map(line => {
+          const c = JSON.parse(line);
+          return {
+            id: c.ID,
+            name: c.Names,
+            image: c.Image,
+            status: c.Status,
+            state: c.State,
+            ports: c.Ports,
+            created: c.CreatedAt
+          };
+        });
+        res.json({ success: true, containers });
+      } catch (error) {
+        res.json({ success: false, containers: [], error: error.message });
+      }
+    });
+
+    // Docker container actions (start/stop/restart)
+    this.app.post('/api/docker/containers/:id/:action', async (req, res) => {
+      try {
+        const { execSync } = require('child_process');
+        const { id, action } = req.params;
+        const safeId = id.replace(/[^a-z0-9_-]/gi, '');
+        const validActions = ['start', 'stop', 'restart', 'pause', 'unpause'];
+
+        if (!validActions.includes(action)) {
+          return res.status(400).json({ error: 'Invalid action' });
+        }
+
+        execSync(`docker ${action} ${safeId} 2>/dev/null`, { encoding: 'utf8' });
+        res.json({ success: true, action, containerId: safeId });
+      } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+      }
+    });
+
+    // Get Docker container logs
+    this.app.get('/api/docker/containers/:id/logs', async (req, res) => {
+      try {
+        const { id } = req.params;
+        const { tail = '100', follow } = req.query;
+        const safeId = id.replace(/[^a-z0-9_-]/gi, '');
+        const safeTail = parseInt(tail) || 100;
+
+        if (follow === 'true') {
+          // Streaming logs via SSE
+          const { spawn } = require('child_process');
+          res.setHeader('Content-Type', 'text/event-stream');
+          res.setHeader('Cache-Control', 'no-cache');
+          res.setHeader('Connection', 'keep-alive');
+
+          const proc = spawn('docker', ['logs', '-f', '--tail', String(safeTail), safeId]);
+
+          proc.stdout.on('data', (data) => {
+            const lines = data.toString().split('\n');
+            lines.forEach(line => {
+              if (line) res.write(`data: ${JSON.stringify({ line })}\n\n`);
+            });
+          });
+
+          proc.stderr.on('data', (data) => {
+            const lines = data.toString().split('\n');
+            lines.forEach(line => {
+              if (line) res.write(`data: ${JSON.stringify({ line })}\n\n`);
+            });
+          });
+
+          proc.on('close', () => {
+            res.write('data: {"done": true}\n\n');
+            res.end();
+          });
+
+          req.on('close', () => {
+            proc.kill();
+          });
+        } else {
+          const { execSync } = require('child_process');
+          const logs = execSync(`docker logs --tail ${safeTail} ${safeId} 2>&1`, { encoding: 'utf8' });
+          res.json({ success: true, logs });
+        }
+      } catch (error) {
+        res.json({ success: false, logs: '', error: error.message });
+      }
+    });
+
     // Git status endpoint for current session working dir
     this.app.get('/api/git/status', async (req, res) => {
       const { path: workingDir } = req.query;

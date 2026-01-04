@@ -178,9 +178,179 @@ class ClaudeCodeWebInterface {
     // Status bar updates
     async updateStatusBar() {
         this.updateK8sStatus();
+        this.updateDockerStatus();
         if (this.currentFolderPath) {
             this.updateGitStatus(this.currentFolderPath);
         }
+    }
+
+    async updateDockerStatus() {
+        const statusEl = document.getElementById('dockerStatus');
+        if (!statusEl) return;
+
+        try {
+            const response = await this.authFetch('/api/docker/status');
+            const data = await response.json();
+
+            if (data.success) {
+                statusEl.classList.add('docker');
+                const total = data.containers.running + data.containers.paused + data.containers.stopped;
+                statusEl.querySelector('.status-text').textContent = `${data.containers.running}/${total}`;
+                statusEl.style.cursor = 'pointer';
+                statusEl.title = `Docker: ${data.containers.running} running, ${data.containers.stopped} stopped`;
+
+                if (!statusEl.dataset.hasClickHandler) {
+                    statusEl.dataset.hasClickHandler = 'true';
+                    statusEl.addEventListener('click', () => this.showDockerViewer());
+                }
+            } else {
+                statusEl.querySelector('.status-text').textContent = 'N/A';
+            }
+        } catch (error) {
+            statusEl.querySelector('.status-text').textContent = '--';
+        }
+    }
+
+    async showDockerViewer() {
+        const response = await this.authFetch('/api/docker/containers?all=true');
+        const data = await response.json();
+
+        const modal = document.createElement('div');
+        modal.className = 'k8s-switcher-modal';
+        modal.innerHTML = `
+            <div class="docker-content">
+                <div class="k8s-switcher-header">
+                    <h3>Docker Containers</h3>
+                    <button class="k8s-switcher-close">&times;</button>
+                </div>
+                <div class="docker-containers-list">
+                    ${data.success && data.containers.length > 0 ?
+                        data.containers.map(c => `
+                            <div class="docker-container-item" data-id="${c.id}" data-name="${c.name}">
+                                <div class="docker-container-status ${c.state}">${c.state}</div>
+                                <div class="docker-container-info">
+                                    <div class="docker-container-name">${c.name}</div>
+                                    <div class="docker-container-meta">${c.image}</div>
+                                </div>
+                                <div class="docker-container-actions">
+                                    ${c.state === 'running' ?
+                                        `<button class="docker-action-btn" data-action="stop" title="Stop">⏹</button>
+                                         <button class="docker-action-btn" data-action="restart" title="Restart">↻</button>` :
+                                        `<button class="docker-action-btn" data-action="start" title="Start">▶</button>`
+                                    }
+                                    <button class="docker-logs-btn" title="View Logs">Logs</button>
+                                </div>
+                            </div>
+                        `).join('') :
+                        '<div class="docker-no-containers">No containers found</div>'
+                    }
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Close handlers
+        modal.querySelector('.k8s-switcher-close').addEventListener('click', () => {
+            document.body.removeChild(modal);
+        });
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) document.body.removeChild(modal);
+        });
+
+        // Action button handlers
+        modal.querySelectorAll('.docker-action-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const item = btn.closest('.docker-container-item');
+                const containerId = item.dataset.id;
+                const action = btn.dataset.action;
+
+                btn.disabled = true;
+                await this.authFetch(`/api/docker/containers/${containerId}/${action}`, { method: 'POST' });
+
+                // Refresh the list
+                document.body.removeChild(modal);
+                this.showDockerViewer();
+                this.updateDockerStatus();
+            });
+        });
+
+        // Log button handlers
+        modal.querySelectorAll('.docker-logs-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const item = btn.closest('.docker-container-item');
+                const containerId = item.dataset.id;
+                const containerName = item.dataset.name;
+                document.body.removeChild(modal);
+                this.showDockerLogs(containerId, containerName);
+            });
+        });
+    }
+
+    async showDockerLogs(containerId, containerName) {
+        const response = await this.authFetch(`/api/docker/containers/${containerId}/logs?tail=200`);
+        const data = await response.json();
+
+        const modal = document.createElement('div');
+        modal.className = 'k8s-switcher-modal k8s-logs-modal';
+        modal.innerHTML = `
+            <div class="k8s-logs-content">
+                <div class="k8s-switcher-header">
+                    <h3>Logs: ${containerName}</h3>
+                    <div class="k8s-logs-controls">
+                        <label>
+                            <input type="checkbox" id="dockerLogsFollow"> Follow
+                        </label>
+                        <button class="k8s-switcher-close">&times;</button>
+                    </div>
+                </div>
+                <div class="k8s-logs-output" id="dockerLogsOutput">
+                    <pre>${data.success ? this.escapeHtml(data.logs) : 'Failed to fetch logs'}</pre>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        const logsOutput = modal.querySelector('#dockerLogsOutput pre');
+        const followCheckbox = modal.querySelector('#dockerLogsFollow');
+        let eventSource = null;
+
+        followCheckbox.addEventListener('change', () => {
+            if (followCheckbox.checked) {
+                eventSource = new EventSource(`/api/docker/containers/${containerId}/logs?follow=true&tail=50`);
+
+                eventSource.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    if (data.line) {
+                        logsOutput.textContent += data.line + '\n';
+                        logsOutput.parentElement.scrollTop = logsOutput.parentElement.scrollHeight;
+                    }
+                    if (data.done) eventSource.close();
+                };
+
+                eventSource.onerror = () => {
+                    eventSource.close();
+                    followCheckbox.checked = false;
+                };
+            } else if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+        });
+
+        const closeModal = () => {
+            if (eventSource) eventSource.close();
+            document.body.removeChild(modal);
+        };
+
+        modal.querySelector('.k8s-switcher-close').addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
     }
 
     async updateK8sStatus() {
