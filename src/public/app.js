@@ -181,7 +181,92 @@ class ClaudeCodeWebInterface {
         this.updateDockerStatus();
         if (this.currentFolderPath) {
             this.updateGitStatus(this.currentFolderPath);
+            this.updateTerraformStatus(this.currentFolderPath);
         }
+    }
+
+    async updateTerraformStatus(workingDir) {
+        const statusEl = document.getElementById('terraformStatus');
+        if (!statusEl) return;
+
+        try {
+            const response = await this.authFetch(`/api/terraform/status?path=${encodeURIComponent(workingDir)}`);
+            const data = await response.json();
+
+            if (data.success && data.hasTerraform) {
+                statusEl.style.display = 'flex';
+                statusEl.classList.add('terraform');
+                statusEl.querySelector('.status-text').textContent = data.hasState ?
+                    `${data.workspace}` : 'no state';
+                statusEl.style.cursor = 'pointer';
+                statusEl.title = `Terraform: ${data.tfFiles} files, workspace: ${data.workspace}`;
+
+                if (!statusEl.dataset.hasClickHandler) {
+                    statusEl.dataset.hasClickHandler = 'true';
+                    statusEl.addEventListener('click', () => this.showTerraformViewer());
+                }
+            } else {
+                statusEl.style.display = 'none';
+            }
+        } catch (error) {
+            statusEl.style.display = 'none';
+        }
+    }
+
+    async showTerraformViewer() {
+        const workingDir = this.currentFolderPath;
+        if (!workingDir) return;
+
+        const [stateRes, workspacesRes] = await Promise.all([
+            this.authFetch(`/api/terraform/state?path=${encodeURIComponent(workingDir)}`),
+            this.authFetch(`/api/terraform/workspaces?path=${encodeURIComponent(workingDir)}`)
+        ]);
+
+        const stateData = await stateRes.json();
+        const workspacesData = await workspacesRes.json();
+
+        const modal = document.createElement('div');
+        modal.className = 'k8s-switcher-modal';
+        modal.innerHTML = `
+            <div class="terraform-content">
+                <div class="k8s-switcher-header">
+                    <h3>Terraform State</h3>
+                    <button class="k8s-switcher-close">&times;</button>
+                </div>
+                <div class="terraform-workspaces">
+                    <label>Workspace</label>
+                    <div class="terraform-workspace-list">
+                        ${workspacesData.success ? workspacesData.workspaces.map(w => `
+                            <span class="terraform-workspace ${w.current ? 'current' : ''}">${w.name}</span>
+                        `).join('') : '<span class="terraform-workspace current">default</span>'}
+                    </div>
+                </div>
+                <div class="terraform-resources">
+                    <label>Resources (${stateData.success ? stateData.count : 0})</label>
+                    <div class="terraform-resource-list">
+                        ${stateData.success && stateData.resources.length > 0 ?
+                            stateData.resources.map(r => `
+                                <div class="terraform-resource-item">
+                                    <span class="terraform-resource-type">${r.type}</span>
+                                    <span class="terraform-resource-name">${r.name}</span>
+                                </div>
+                            `).join('') :
+                            '<div class="terraform-no-resources">No resources in state</div>'
+                        }
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        modal.querySelector('.k8s-switcher-close').addEventListener('click', () => {
+            document.body.removeChild(modal);
+        });
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) document.body.removeChild(modal);
+        });
     }
 
     async updateDockerStatus() {

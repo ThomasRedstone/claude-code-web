@@ -103,6 +103,14 @@ aa2e6e4 feat: add session templates for quick-launch presets
 - Container actions: Start, Stop, Restart, View Logs
 - Color-coded status: Running (green), Exited (gray), Paused (yellow)
 
+#### 3.6 Terraform Integration ✅
+- Terraform status in status bar (only shown if .tf files exist)
+- Click to open state viewer modal
+- `/api/terraform/status` - Check for Terraform files and state
+- `/api/terraform/workspaces` - List Terraform workspaces
+- `/api/terraform/state` - Get resource list from state
+- Shows current workspace and all resources
+
 #### Keyboard Shortcuts ✅
 - Ctrl+Shift+E: Export session
 - Ctrl+K: Clear terminal
@@ -156,6 +164,9 @@ package.json          - Updated dependencies
 | `/api/docker/containers` | GET | List containers |
 | `/api/docker/containers/:id/:action` | POST | Start/stop/restart container |
 | `/api/docker/containers/:id/logs` | GET | Container logs (supports SSE) |
+| `/api/terraform/status` | GET | Check for Terraform in directory |
+| `/api/terraform/workspaces` | GET | List Terraform workspaces |
+| `/api/terraform/state` | GET | List resources in state |
 | `/api/git/status` | GET | Git branch + modified count |
 | `/api/sessions/:id/export` | GET | Export session (md/json/html/txt) |
 
@@ -213,8 +224,8 @@ curl "http://localhost:32353/api/git/status?path=/home/tom/own/claude-code-web" 
 - [x] K8s context switcher UI
 - [x] Pod log streaming (with SSE)
 - [x] Docker container management
-- [ ] Terraform state display - Future
-- [ ] AWS status panel - Future
+- [x] Terraform state display
+- [ ] AWS status panel - Future (would require credentials)
 
 ### Phase 4-5 (Future)
 - [ ] Multi-user support

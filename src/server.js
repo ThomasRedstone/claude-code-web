@@ -974,6 +974,93 @@ ${cleanOutput}
       }
     });
 
+    // Terraform status endpoint
+    this.app.get('/api/terraform/status', async (req, res) => {
+      const { path: workingDir } = req.query;
+      if (!workingDir) {
+        return res.status(400).json({ error: 'Working directory required' });
+      }
+      try {
+        const fs = require('fs').promises;
+        const path = require('path');
+
+        // Check for .tf files
+        const files = await fs.readdir(workingDir);
+        const tfFiles = files.filter(f => f.endsWith('.tf'));
+
+        if (tfFiles.length === 0) {
+          return res.json({ success: true, hasTerraform: false });
+        }
+
+        // Check for terraform state
+        const hasState = files.includes('terraform.tfstate') || files.includes('.terraform');
+
+        // Get workspace
+        let workspace = 'default';
+        try {
+          const { execSync } = require('child_process');
+          workspace = execSync('terraform workspace show 2>/dev/null', { cwd: workingDir, encoding: 'utf8' }).trim();
+        } catch (e) {
+          // Ignore workspace errors
+        }
+
+        res.json({
+          success: true,
+          hasTerraform: true,
+          tfFiles: tfFiles.length,
+          hasState,
+          workspace
+        });
+      } catch (error) {
+        res.json({ success: false, error: error.message });
+      }
+    });
+
+    // List Terraform workspaces
+    this.app.get('/api/terraform/workspaces', async (req, res) => {
+      const { path: workingDir } = req.query;
+      if (!workingDir) {
+        return res.status(400).json({ error: 'Working directory required' });
+      }
+      try {
+        const { execSync } = require('child_process');
+        const output = execSync('terraform workspace list 2>/dev/null', { cwd: workingDir, encoding: 'utf8' });
+        const workspaces = output.trim().split('\n').map(line => {
+          const isCurrent = line.startsWith('*');
+          return {
+            name: line.replace(/^\*?\s*/, '').trim(),
+            current: isCurrent
+          };
+        }).filter(w => w.name);
+        res.json({ success: true, workspaces });
+      } catch (error) {
+        res.json({ success: false, workspaces: [], error: error.message });
+      }
+    });
+
+    // Get Terraform state summary
+    this.app.get('/api/terraform/state', async (req, res) => {
+      const { path: workingDir } = req.query;
+      if (!workingDir) {
+        return res.status(400).json({ error: 'Working directory required' });
+      }
+      try {
+        const { execSync } = require('child_process');
+        const output = execSync('terraform state list 2>/dev/null', { cwd: workingDir, encoding: 'utf8' });
+        const resources = output.trim().split('\n').filter(Boolean).map(resource => {
+          const parts = resource.split('.');
+          return {
+            type: parts.slice(0, -1).join('.'),
+            name: parts[parts.length - 1],
+            full: resource
+          };
+        });
+        res.json({ success: true, resources, count: resources.length });
+      } catch (error) {
+        res.json({ success: false, resources: [], error: error.message });
+      }
+    });
+
     // Git status endpoint for current session working dir
     this.app.get('/api/git/status', async (req, res) => {
       const { path: workingDir } = req.query;

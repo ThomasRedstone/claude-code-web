@@ -1416,6 +1416,105 @@ body {
     color: var(--text-secondary);
 }
 
+/* Terraform Viewer */
+.terraform-content {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    width: 500px;
+    max-height: 70vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.terraform-workspaces {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.terraform-workspaces label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+}
+
+.terraform-workspace-list {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.terraform-workspace {
+    padding: 6px 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.terraform-workspace.current {
+    background: rgba(136, 87, 229, 0.2);
+    border-color: #8957e5;
+    color: #a371f7;
+}
+
+.terraform-resources {
+    padding: 16px 20px;
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.terraform-resources label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+}
+
+.terraform-resource-list {
+    overflow-y: auto;
+    max-height: 300px;
+}
+
+.terraform-resource-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.terraform-resource-item:last-child {
+    border-bottom: none;
+}
+
+.terraform-resource-type {
+    font-size: 12px;
+    color: #a371f7;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.terraform-resource-name {
+    font-size: 13px;
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.terraform-no-resources {
+    padding: 30px 0;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
 #terminal {
     width: 100%;
     height: 100%;
