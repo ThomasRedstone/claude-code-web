@@ -27,7 +27,8 @@ class ClaudeCodeWebServer {
     this.keyFile = options.key;
     this.folderMode = options.folderMode !== false; // Default to true
     this.selectedWorkingDir = null;
-    this.baseFolder = process.cwd(); // The folder where the app runs from
+    // Base folder for path validation - use --base-folder option, env var, or default to home
+    this.baseFolder = options.baseFolder || process.env.CLAUDE_CODE_WEB_BASE || process.env.HOME || process.cwd();
     // Session duration in hours (default to 5 hours from first message)
     this.sessionDurationHours = parseFloat(process.env.CLAUDE_SESSION_HOURS || options.sessionHours || 5);
     

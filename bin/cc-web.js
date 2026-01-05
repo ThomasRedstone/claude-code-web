@@ -26,6 +26,7 @@ program
   .option('--agent-alias <name>', 'display alias for Agent (default: env AGENT_ALIAS or "Cursor")')
   .option('--ngrok-auth-token <token>', 'ngrok auth token to open a public tunnel')
   .option('--ngrok-domain <domain>', 'ngrok reserved domain to use for the tunnel')
+  .option('--base-folder <path>', 'base folder for path validation (default: $HOME)')
   .parse();
 
 const options = program.opts();
@@ -75,7 +76,8 @@ async function main() {
       claudeAlias: options.claudeAlias || process.env.CLAUDE_ALIAS || 'Claude',
       codexAlias: options.codexAlias || process.env.CODEX_ALIAS || 'Codex',
       agentAlias: options.agentAlias || process.env.AGENT_ALIAS || 'Cursor',
-      folderMode: true // Always use folder mode
+      folderMode: true, // Always use folder mode
+      baseFolder: options.baseFolder // Base folder for path validation (defaults to $HOME in server)
     };
 
     console.log('Starting Claude Code Web Interface...');
