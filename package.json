@@ -31,7 +31,12 @@
     "node-pty": "^1.0.0",
     "open": "^10.1.0",
     "uuid": "^10.0.0",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "@opentelemetry/sdk-node": "^0.45.1",
+    "@opentelemetry/auto-instrumentations-node": "^0.40.3",
+    "@opentelemetry/exporter-trace-otlp-grpc": "^0.45.1",
+    "@opentelemetry/exporter-metrics-otlp-grpc": "^0.45.1",
+    "@opentelemetry/sdk-metrics": "^1.19.0"
   },
   "engines": {
     "node": ">=16.0.0"

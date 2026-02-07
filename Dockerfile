@@ -24,4 +24,4 @@ COPY . .
 EXPOSE 32352
 
 # Define the command to run your app
-CMD ["node", "bin/cc-web.js"]
+CMD ["node", "--require", "./tracing.js", "bin/cc-web.js"]
