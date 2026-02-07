@@ -24,4 +24,4 @@ COPY . .
 EXPOSE 32352
 
 # Define the command to run your app
-CMD ["node", "src/server.js"]
+CMD ["node", "bin/cc-web.js"]
