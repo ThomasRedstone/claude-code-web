@@ -15,7 +15,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install application dependencies using 'npm ci' for deterministic installs
-RUN npm ci --only=production
+RUN npm ci
 
 # Copy the rest of the application source code to the working directory
 COPY . .
